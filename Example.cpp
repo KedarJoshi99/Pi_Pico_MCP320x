@@ -9,11 +9,13 @@
 
 #define CSn 17
 
+ 
 
 
 int main(){
 
     MCP320X mcp3208(MCP320x,0,CSn);
+    
     while(1){
         printf("MCP3208: ADC Values are:\n");
         for(int i = 0; i < 8; i ++){

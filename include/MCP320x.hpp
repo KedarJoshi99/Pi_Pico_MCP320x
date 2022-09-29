@@ -60,6 +60,7 @@ MCP320X::MCP320X(uint8_t model, uint8_t _spi, uint8_t cspin) {
 		_misopin = 12;
 	}
 
+	
     
 // This example will use SPI0 at 0.5MHz.
     spi_init(spi, 500 * 1000);
@@ -68,6 +69,12 @@ MCP320X::MCP320X(uint8_t model, uint8_t _spi, uint8_t cspin) {
     gpio_set_function(_mosipin, GPIO_FUNC_SPI);
     // // Make the SPI pins available to picotool
     // bi_decl(bi_3pins_with_func(_misopin, _mosipin, _clockpin, GPIO_FUNC_SPI));
+
+    spi_set_format( spi,   // SPI instance
+                    8,      // Number of bits per transfer
+                    SPI_CPOL_1,      // Polarity (CPOL)
+                    SPI_CPHA_1,      // Phase (CPHA)
+                    SPI_MSB_FIRST);
 
     // Chip select is active-low, so we'll initialise it to a driven-high state
     gpio_init(_cspin);
@@ -91,11 +98,19 @@ MCP320X::MCP320X(uint8_t model, uint8_t _spi, uint8_t clockpin, uint8_t mosipin,
 		spi = spi1;
 	}
 
+	
+
 	// This example will use SPI0 at 0.5MHz.
     spi_init(spi, 500 * 1000);
     gpio_set_function(_misopin, GPIO_FUNC_SPI);
     gpio_set_function(_clockpin, GPIO_FUNC_SPI);
     gpio_set_function(_mosipin, GPIO_FUNC_SPI);
+
+	spi_set_format( spi,   // SPI instance
+                    8,      // Number of bits per transfer
+                    SPI_CPOL_1,      // Polarity (CPOL)
+                    SPI_CPHA_1,      // Phase (CPHA)
+                    SPI_MSB_FIRST);
 
     // // Make the SPI pins available to picotool
     // bi_decl(bi_3pins_with_func(_misopin, _mosipin, _clockpin, GPIO_FUNC_SPI));
