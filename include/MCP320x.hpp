@@ -2,10 +2,26 @@
 #define MCP320X_h
 
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include "hardware/gpio.h"
 #include "hardware/spi.h"
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
+
+uint8_t ch0 = 0B10000000;
+#define B10000000 0x80 ///0
+#define B10010000 0x90 ///1
+#define B10100000 0xA0 ///2
+#define B10110000 0xB0 ///3
+#define B11000000 0xC0 ///4
+#define B11010000 0xD0 ///5
+#define B11100000 0xE0 ///6
+#define B11110000 0xF0 ///7
+
+
+
 
 /* MCP320X Class * ===========================================================================> 
 *  See MCP320X.cpp for more details
@@ -13,12 +29,18 @@
 class MCP320X
 {
 	public:
-		MCP320X(uint8_t model, uint8_t clockpin, uint8_t mosipin, uint8_t misopin, uint8_t cspin);
+		MCP320X(uint8_t model, uint8_t _spi, uint8_t cspin);
+		MCP320X(uint8_t model, uint8_t _spi, uint8_t clockpin, uint8_t mosipin, uint8_t misopin, uint8_t cspin);
 		~MCP320X();
-		int16_t readADC(uint8_t ch);
+		uint8_t* readADC(uint8_t ch);
 		
 	private:
-		  uint8_t _pinNo, _clockpin, _mosipin, _misopin, _cspin;
+		  uint8_t _pinNo, _clockpin, _mosipin, _misopin, _cspin; 
+		  spi_inst_t *spi;
+		  void cs_select();
+		  void cs_deselect();
+		  void read_registers(uint8_t reg, uint8_t *buf, uint16_t len);
+
 };
 #endif 
 
@@ -31,76 +53,104 @@ class MCP320X
 *		* misopin:	The SPI MISO pin of your choice.
 *		* cspin:	The SPI CS pin of your choice.
 * ============================================================================================> */
-MCP320X::MCP320X(uint8_t model, uint8_t clockpin, uint8_t mosipin, uint8_t misopin, uint8_t cspin) {
+MCP320X::MCP320X(uint8_t model, uint8_t _spi, uint8_t cspin) {
     
     // define SPI outputs and inputs for bitbanging
-    _pinNo = model; // the model id (X) defines the number of adc inputs
-    _cspin = cspin;
-    _clockpin = clockpin;
-    _mosipin = mosipin;
-    _misopin = misopin;
+    this->_pinNo = model; // the model id (X) defines the number of adc inputs
+    this->_cspin = cspin;
+    if(_spi == 0){
+		this->_clockpin = PICO_DEFAULT_SPI_SCK_PIN;
+		this->_mosipin = PICO_DEFAULT_SPI_TX_PIN;
+		this->_misopin = PICO_DEFAULT_SPI_RX_PIN;
+	}
+	else{
+		this->spi = spi1;
+		this->_clockpin = 14;
+		this->_mosipin = 15;
+		this->_misopin = 12;
+	}
+
     
-	gpio_init(_cspin);
-	gpio_init(_clockpin);
-	gpio_init(_mosipin);
-	gpio_init(_misopin);
-    gpio_set_dir(_cspin, GPIO_OUT);
-    gpio_set_dir(_clockpin, GPIO_OUT);
-    gpio_set_dir(_mosipin, GPIO_OUT);
-    gpio_set_dir(_misopin, GPIO_IN);
+// This example will use SPI0 at 0.5MHz.
+    spi_init(this->spi, 500 * 1000);
+    gpio_set_function(this->_misopin, GPIO_FUNC_SPI);
+    gpio_set_function(this->_clockpin, GPIO_FUNC_SPI);
+    gpio_set_function(this->_mosipin, GPIO_FUNC_SPI);
+    // Make the SPI pins available to picotool
+    bi_decl(bi_3pins_with_func(this->_misopin, this->_mosipin, this->_clockpin, GPIO_FUNC_SPI));
+
+    // Chip select is active-low, so we'll initialise it to a driven-high state
+    gpio_init(this->_cspin);
+    gpio_set_dir(this->_cspin, GPIO_OUT);
+    gpio_put(this->_cspin, 1);
+    // Make the CS pin available to picotool
+    bi_decl(bi_1pin_with_name(this->_cspin, "SPI CS"));
     
 }
+MCP320X::MCP320X(uint8_t model, uint8_t _spi, uint8_t clockpin, uint8_t mosipin, uint8_t misopin, uint8_t cspin){
 
+	this->_pinNo = model; 
+    this->_cspin = cspin;
+    this->_clockpin = clockpin;
+    this->_mosipin = mosipin;
+    this->_misopin = misopin;
+	if(_spi == 0){
+		this->spi = spi0;
+	}
+	else{
+		this->spi = spi1;
+	}
 
-/* ~MCP320X() ================================================================================>
-*	Destructor function
-* ============================================================================================> */
+	// This example will use SPI0 at 0.5MHz.
+    spi_init(this->spi, 500 * 1000);
+    gpio_set_function(this->_misopin, GPIO_FUNC_SPI);
+    gpio_set_function(this->_clockpin, GPIO_FUNC_SPI);
+    gpio_set_function(this->_mosipin, GPIO_FUNC_SPI);
+
+    // Make the SPI pins available to picotool
+    bi_decl(bi_3pins_with_func(this->_misopin, this->_mosipin, this->_clockpin, GPIO_FUNC_SPI));
+
+    // Chip select is active-low, so we'll initialise it to a driven-high state
+    gpio_init(this->_cspin);
+    gpio_set_dir(this->_cspin, GPIO_OUT);
+    gpio_put(this->_cspin, 1);
+
+    // Make the CS pin available to picotool
+    bi_decl(bi_1pin_with_name(this->_cspin, "SPI CS"));
+}
+
 MCP320X::~MCP320X(){}
 
 
-/* readADC() =================================================================================>
-*	Function to read from a channel.
-*	Parameters:
-*		* channel: The channel number to read from (MAX=_pinNo-1)
-*	Returns:
-*		* The ADC value of a given channel (0-VREF -> 0-4095), if a valid channel is given.
-*		* -1 if the channel id is less than 0 or exceeds the pin number for the defined model.
-* ============================================================================================> */
-int16_t MCP320X::readADC(uint8_t channel)
+
+uint8_t* MCP320X::readADC(uint8_t channel)
 {
-	// If an invalid channel is passed, return -1
-	if ((channel >= _pinNo) || (channel < 0)) return -1; 
-	
-	int adcvalue = 0;
-	uint8_t cmd = 0xC0; //B11000000; //command bits - start, mode, chn (3), dont care (3)
+	uint8_t buffer[26];
+	uint8_t cmd = ((0x01 << 7) |             // start bit
+            (1 << 6) |          // single or differential
+            ((channel & 0x07) << 3)); // channel number
 
-	// allow channel selection
-	cmd|=((channel)<<3);
-
-	gpio_put(_cspin, 0); //Select adc
-	// setup bits to be written
-	for (int i=7; i>=3; i--){
-		gpio_put(_mosipin, cmd & 1<<i);
-		//cycle clock
-		gpio_put(_clockpin, 1);
-		gpio_put(_clockpin, 0);    
-	}
-
-	gpio_put(_clockpin, 1);    //ignores 2 null bits
-	gpio_put(_clockpin, 0);
-	gpio_put(_clockpin, 1);  
-	gpio_put(_clockpin, 0);
-
-	// read bits from adc
-	for (int i=11; i>=0; i--){
-		adcvalue+=gpio_get(_misopin)<<i;
-		//cycle clock
-		gpio_put(_clockpin, 1);
-		gpio_put(_clockpin, 0);
-	}
-	gpio_put(_cspin, 1); //turn off device
-	
-	// return the result
-	return adcvalue;
+	read_registers(cmd, buffer, 24);	
+	return buffer;
 }
+
+void MCP320X::cs_select() {
+    asm volatile("nop \n nop \n nop");
+    gpio_put(_cspin, 0);  // Active low
+    asm volatile("nop \n nop \n nop");
+}
+
+void MCP320X::cs_deselect() {
+    asm volatile("nop \n nop \n nop");
+    gpio_put(_cspin, 1);
+    asm volatile("nop \n nop \n nop");
+}
+
+void MCP320X::read_registers(uint8_t reg, uint8_t *buf, uint16_t len) {
+    cs_select();
+    spi_read_blocking(spi, reg, buf, len);
+    cs_deselect();
+    sleep_ms(10);
+}
+
 
