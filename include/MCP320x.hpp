@@ -38,5 +38,6 @@ static int16_t read_adc(spi_inst_t *spi,int _cspin,uint8_t channel) {
     //sleep_ms(10);
 
     int16_t adc = (int16_t)(data[0] << 7|data[1]);
+    adc &= ~(0xF000);
     return adc;
 }

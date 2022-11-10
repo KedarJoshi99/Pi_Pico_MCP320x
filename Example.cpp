@@ -6,12 +6,12 @@
 #include "pico/binary_info.h"
 #include "include/MCP320x.hpp"
 
-#define PIN_MISO 4
-#define PIN_CS   5
-#define PIN_SCK  6
-#define PIN_MOSI 7
+#define PIN_MISO 8
+#define PIN_CS   9
+#define PIN_SCK  10
+#define PIN_MOSI 11
 
-#define SPI_PORT spi0
+#define SPI_PORT spi1
 
 int main(){
 
