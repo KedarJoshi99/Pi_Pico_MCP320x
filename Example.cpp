@@ -46,7 +46,7 @@ int main(){
         printf("MCP3208 Readings"); 
         for(int i = 0; i < 8; i++){
             int temp = (int)read_adc(SPI_PORT,PIN_CS,i);
-            printf("channel %d, adc = %d\n",i,temp); 
+            printf("channel %d, adc = %f\n",i,((double)temp)); 
         }
         sleep_ms(1000);
     }

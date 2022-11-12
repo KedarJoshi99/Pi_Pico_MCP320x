@@ -28,16 +28,14 @@ static int16_t read_adc(spi_inst_t *spi,int _cspin,uint8_t channel) {
     (1 << 6) |          // single or differential
     ((channel & 0x07) << 3)); // channel number
     // Buffer to store raw reads
-    uint8_t data[2];
+    uint8_t data[3];
    
     cs_select(_cspin);
-    spi_write_blocking(spi, &cmd, 1);
-    //sleep_ms(10);
-    spi_read_blocking(spi, 0, data, 2);
+    spi_read_blocking(spi, cmd, data, 3);
     cs_deselect(_cspin);
-    //sleep_ms(10);
 
-    int16_t adc = (int16_t)(data[0] << 7|data[1]);
-    adc &= ~(0xF000);
+    
+    int adc = (0x00000000) | (data[0] << 16)| (data[1] << 8) | (data[2]);
+    adc = adc >> 5;
     return adc;
 }
